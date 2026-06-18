@@ -1,17 +1,11 @@
-/**
- * Scraper service — two-tier internship status detection engine
- *
- * Tier 1 — Keyword detection  (free,  ~80% coverage)
- * Tier 2 — Hash-based change  (free,  flags unknown changes)
- */
-
+// Scraper service — two-tier internship status detection engine (Tier 1: Keyword, Tier 2: Hash)
 const crypto = require("crypto");
-const firmModel   = require("../models/firm.model");
+const firmModel = require("../models/firm.model");
 const historyModel = require("../models/history.model");
 const cronRunModel = require("../models/cronRun.model");
 
 
-// ─── Global keyword lists ─────────────────────────────────────────────────────
+// ─── Global keyword lists
 const OPEN_KEYWORDS = [
   "apply now",
   "apply here",
@@ -49,6 +43,7 @@ const CLOSED_KEYWORDS = [
 ];
 
 // ─── Playwright fetch (handles JS-rendered pages) ─────────────────────────────
+// Fetches a JS-rendered page via Playwright and extracts text from an optional selector or the body.
 async function fetchWithPlaywright(url, selector) {
   // Dynamic import — server starts even if playwright is not yet installed
   const { chromium } = await import("playwright");
@@ -71,6 +66,7 @@ async function fetchWithPlaywright(url, selector) {
         await page.waitForSelector(selector, { timeout: 5_000 });
         text = await page.innerText(selector);
       } catch {
+        // Fallback to body text if the specific selector is not found or times out
         text = await page.innerText("body");
       }
     } else {
@@ -83,7 +79,7 @@ async function fetchWithPlaywright(url, selector) {
   }
 }
 
-// ─── Axios fetch (static pages / known API endpoints) ────────────────────────
+// Fetches static server-rendered HTML via Axios, stripping tags and collapsing whitespace into plain text.
 async function fetchWithAxios(url) {
   const axios = require("axios");
 
@@ -102,8 +98,7 @@ async function fetchWithAxios(url) {
     .replace(/\s+/g, " ")
     .trim();
 }
-
-// ─── Tier 1: keyword detection ────────────────────────────────────────────────
+// Tier 1 detection: Scans text for global or firm-specific keywords to return "OPEN", "CLOSED", or null.
 function keywordDetect(text, firmOpenSignal, firmClosedSignal) {
   const normalised = text.toLowerCase();
 
@@ -117,21 +112,22 @@ function keywordDetect(text, firmOpenSignal, firmClosedSignal) {
   return null; // ambiguous — escalate to next tier
 }
 
-// ─── Tier 2: SHA-256 page hash ────────────────────────────────────────────────
+// Tier 2 helper: Computes and returns a hexadecimal SHA-256 hash of the input text to detect changes.
 function computeHash(text) {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
 
-// ─── Check a single firm (two-tier detection) ─────────────────────────────────
+// ─── Check a single firm (two-tier detection)
+// Performs a two-tier status check (Fetch -> Keywords -> Hash), records history, and updates the firm status.
 async function checkFirm(firm) {
   const now = new Date().toISOString().slice(0, 19).replace("T", " "); // MySQL DATETIME format
-  let pageText  = "";
+  let pageText = "";
   let newStatus = "UNKNOWN";
   let detectedBy = "keyword";
   let errorMessage = null;
 
   try {
-    // ── Fetch page content ──────────────────────────────────────────────────
+    // Fetch page content
     if (
       firm.scrape_method === "playwright" ||
       firm.scrape_method === "playwright_interact"
@@ -143,27 +139,27 @@ async function checkFirm(firm) {
 
     const newHash = computeHash(pageText);
 
-    // ── Tier 1: keyword detection ───────────────────────────────────────────
+    // ── Tier 1: keyword detection
     const keywordResult = keywordDetect(pageText, firm.open_signal, firm.closed_signal);
 
     if (keywordResult) {
-      newStatus  = keywordResult;
+      newStatus = keywordResult;
       detectedBy = "keyword";
     } else {
-      // ── Tier 2: hash comparison ─────────────────────────────────────────
+      // ── Tier 2: hash comparison
       const lastEntry = await historyModel.findLatestByFirmId(firm.id);
 
       if (!lastEntry) {
         // First ever scrape — no prior data, mark as UNKNOWN
-        newStatus  = "UNKNOWN";
+        newStatus = "UNKNOWN";
         detectedBy = "no_history";
       } else if (lastEntry.page_hash === newHash) {
         // Page unchanged — carry forward last known status
-        newStatus  = lastEntry.status;
+        newStatus = lastEntry.status;
         detectedBy = "hash_match";
       } else {
         // Hash changed but keywords inconclusive — mark UNKNOWN for manual review
-        newStatus  = "UNKNOWN";
+        newStatus = "UNKNOWN";
         detectedBy = "hash_changed";
       }
 
@@ -171,26 +167,25 @@ async function checkFirm(firm) {
 
     const rawSnippet = pageText.slice(0, 500).replace(/\s+/g, " ").trim();
 
-    // ── Persist scrape result ───────────────────────────────────────────────
+    // ── Persist scrape result 
     await historyModel.create({
-      firm_id:    firm.id,
-      status:     newStatus,
-      page_hash:  computeHash(pageText),
+      firm_id: firm.id,
+      status: newStatus,
+      page_hash: computeHash(pageText),
+      page_hash: newHash,
       detected_by: detectedBy,
       raw_snippet: rawSnippet,
     });
 
     const changed = firm.current_status !== newStatus;
 
-    // ── Update firm record ──────────────────────────────────────────────────
+    // ── Update firm record
     await firmModel.updateStatus(firm.id, { newStatus, changed, now });
 
-
-
     return {
-      firmId:     firm.id,
-      name:       firm.name,
-      status:     newStatus,
+      firmId: firm.id,
+      name: firm.name,
+      status: newStatus,
       changed,
       detectedBy,
     };
@@ -200,8 +195,8 @@ async function checkFirm(firm) {
 
     // Record error in history
     await historyModel.create({
-      firm_id:     firm.id,
-      status:      "UNKNOWN",
+      firm_id: firm.id,
+      status: "UNKNOWN",
       detected_by: "error",
       raw_snippet: `ERROR: ${err.message.slice(0, 200)}`,
     });
@@ -210,17 +205,18 @@ async function checkFirm(firm) {
     await firmModel.updateById(firm.id, { last_checked_at: now });
 
     return {
-      firmId:     firm.id,
-      name:       firm.name,
-      status:     "UNKNOWN",
-      changed:    false,
+      firmId: firm.id,
+      name: firm.name,
+      status: "UNKNOWN",
+      changed: false,
       detectedBy: "error",
-      error:      errorMessage,
+      error: errorMessage,
     };
   }
 }
 
-// ─── Run all active firms with a concurrency cap ──────────────────────────────
+// ─── Run all active firms with a concurrency cap
+// Scrapes all active firms concurrently in batches, tracking progress, changes, and errors for the cron run.
 async function checkAllFirms({ concurrency = 5, onProgress } = {}) {
   const pool = require("../config/db.config").getPool();
   const [rows] = await pool.query("SELECT * FROM firms WHERE active = 1");
@@ -230,15 +226,16 @@ async function checkAllFirms({ concurrency = 5, onProgress } = {}) {
   const runId = await cronRunModel.createRun();
 
   let checked = 0;
-  let changed  = 0;
-  let errors   = 0;
+  let changed = 0;
+  let errors = 0;
   const errorDetails = [];
 
   // Process firms in batches of `concurrency`
   for (let i = 0; i < firms.length; i += concurrency) {
-    const batch   = firms.slice(i, i + concurrency);
+    const batch = firms.slice(i, i + concurrency);
     const results = await Promise.allSettled(batch.map((f) => checkFirm(f)));
 
+    // Tally results from the batch, distinguishing fulfilled promises from rejections.
     for (const result of results) {
       checked++;
 
