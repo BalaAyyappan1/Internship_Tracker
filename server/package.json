@@ -1,0 +1,40 @@
+{
+  "name": "internship_tracker",
+  "version": "1.0.0",
+  "description": "Automated internship application tracker with three-tier scraping and MySQL persistence",
+  "main": "app.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BalaAyyappan1/Internship_Tracker.git"
+  },
+  "keywords": [
+    "internship",
+    "scraper",
+    "tracker"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/BalaAyyappan1/Internship_Tracker/issues"
+  },
+  "homepage": "https://github.com/BalaAyyappan1/Internship_Tracker#readme",
+  "dependencies": {
+    "axios": "^1.6.7",
+    "cheerio": "^1.0.0-rc.12",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "mysql2": "^3.22.5",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^3.3.2",
+    "playwright": "^1.44.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
