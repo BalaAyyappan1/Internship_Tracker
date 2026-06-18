@@ -8,9 +8,9 @@ interface StatusBadgeProps {
 }
 
 const CONFIG = {
-  OPEN:    { label: "Open",    dot: "bg-emerald-400", text: "text-emerald-300", ring: "ring-emerald-500/30", bg: "bg-emerald-500/10" },
-  CLOSED:  { label: "Closed",  dot: "bg-red-400",     text: "text-red-300",     ring: "ring-red-500/30",     bg: "bg-red-500/10"     },
-  UNKNOWN: { label: "Unknown", dot: "bg-amber-400",   text: "text-amber-300",   ring: "ring-amber-500/30",   bg: "bg-amber-500/10"   },
+  OPEN: { label: "Open", dot: "bg-emerald-500", text: "text-emerald-700", ring: "ring-emerald-200", bg: "bg-emerald-50" },
+  CLOSED: { label: "Closed", dot: "bg-red-500", text: "text-red-700", ring: "ring-red-200", bg: "bg-red-50" },
+  UNKNOWN: { label: "Unknown", dot: "bg-amber-500", text: "text-amber-700", ring: "ring-amber-200", bg: "bg-amber-50" },
 };
 
 export default function StatusBadge({ status, size = "md" }: StatusBadgeProps) {

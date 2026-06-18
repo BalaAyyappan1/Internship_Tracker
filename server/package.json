@@ -31,7 +31,6 @@
     "express": "^5.2.1",
     "mysql2": "^3.22.5",
     "node-cron": "^3.0.3",
-    "node-fetch": "^3.3.2",
     "playwright": "^1.44.0"
   },
   "devDependencies": {
