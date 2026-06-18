@@ -232,6 +232,7 @@ async function checkAllFirms({ concurrency = 5, onProgress } = {}) {
   let checked = 0;
   let changed  = 0;
   let errors   = 0;
+  const errorDetails = [];
 
   // Process firms in batches of `concurrency`
   for (let i = 0; i < firms.length; i += concurrency) {
@@ -243,13 +244,17 @@ async function checkAllFirms({ concurrency = 5, onProgress } = {}) {
 
       if (result.status === "fulfilled") {
         if (result.value.changed) changed++;
-        if (result.value.error)   errors++;
+        if (result.value.error) {
+          errors++;
+          errorDetails.push({ name: result.value.name, error: result.value.error });
+        }
       } else {
         errors++;
+        errorDetails.push({ name: "Unknown Firm", error: result.reason || "Promise rejected" });
       }
 
       if (onProgress) {
-        onProgress({ checked, total: firms.length, changed, errors });
+        onProgress({ checked, total: firms.length, changed, errors, errorDetails });
       }
     }
 
@@ -270,7 +275,7 @@ async function checkAllFirms({ concurrency = 5, onProgress } = {}) {
     `[Scraper] Run complete — checked: ${checked}, changed: ${changed}, errors: ${errors}`
   );
 
-  return { checked, changed, errors, runId };
+  return { checked, changed, errors, errorDetails, runId };
 }
 
 module.exports = { checkFirm, checkAllFirms };
